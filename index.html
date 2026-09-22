@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0f1a">
+    <meta name="description" content="Финансовый трекер - учет расходов">
+    <title>Финансы</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>Финансы</h1>
+        </header>
+
+        <main class="main">
+            <div class="circle-container">
+                <div class="circle-wrapper" id="circleWrapper">
+                    <svg class="circle-svg" id="circleSvg" viewBox="0 0 320 320">
+                        <defs>
+                            <linearGradient id="expenseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#ff6b6b"/>
+                                <stop offset="100%" style="stop-color:#ee5a5a"/>
+                            </linearGradient>
+                            <linearGradient id="quotaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#ffe66d"/>
+                                <stop offset="100%" style="stop-color:#ffd93d"/>
+                            </linearGradient>
+                            <linearGradient id="burnGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#ff3333"/>
+                                <stop offset="50%" style="stop-color:#ff5533"/>
+                                <stop offset="100%" style="stop-color:#ff3333"/>
+                            </linearGradient>
+                            <radialGradient id="bgGradient" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" style="stop-color:#1f2a4a"/>
+                                <stop offset="100%" style="stop-color:#131b3a"/>
+                            </radialGradient>
+                        </defs>
+                        <circle class="circle-bg" cx="160" cy="160" r="140"/>
+                        <circle class="circle-bg" cx="160" cy="160" r="105" stroke-width="8" stroke="rgba(255,255,255,0.03)"/>
+                        <circle class="circle-progress quota-ring" id="quotaRing" cx="160" cy="160" r="140"
+                                stroke-dasharray="880" stroke-dashoffset="880"/>
+                        <circle class="circle-progress expense-ring" id="expenseRing" cx="160" cy="160" r="122"
+                                stroke-dasharray="766" stroke-dashoffset="766"/>
+                    </svg>
+                    <div class="circle-center" id="circleCenter">
+                        <div class="center-amount" id="centerAmount">0 ₽</div>
+                        <div class="center-label" id="centerLabel">Недельный лимит</div>
+                        <div class="center-quota" id="centerQuota">Квота: 0 ₽</div>
+                        <div class="center-warning" id="centerWarning"></div>
+                    </div>
+                </div>
+                <div class="period-tabs">
+                    <button class="tab-btn active" data-period="week">Неделя</button>
+                    <button class="tab-btn" data-period="month">Месяц</button>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card expense">
+                    <span class="stat-icon">💸</span>
+                    <div>
+                        <span class="stat-label">Потрачено</span>
+                        <span class="stat-value" id="totalExpense">0 ₽</span>
+                    </div>
+                </div>
+                <div class="stat-card balance">
+                    <span class="stat-icon">💵</span>
+                    <div>
+                        <span class="stat-label">Остаток недели</span>
+                        <span class="stat-value" id="totalBalance">0 ₽</span>
+                    </div>
+                </div>
+                <div class="stat-card monthly">
+                    <span class="stat-icon">📅</span>
+                    <div>
+                        <span class="stat-label">Доступно в месяц</span>
+                        <span class="stat-value" id="monthlyAvailable">0 ₽</span>
+                    </div>
+                </div>
+            </div>
+
+            <section class="section">
+                <h2>Расходы по категориям</h2>
+                <div class="category-list" id="categoryList"></div>
+            </section>
+
+            <section class="section">
+                <h2>История расходов</h2>
+                <div class="transactions" id="transactionsList"></div>
+            </section>
+        </main>
+
+        <nav class="bottom-nav" id="bottomNav">
+            <button class="nav-btn active" data-view="main">Главная</button>
+            <button class="nav-btn" data-view="add">Добавить</button>
+            <button class="nav-btn" data-view="settings">Настройки</button>
+        </nav>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="addModal">
+            <div class="modal-header">
+                <h3>Новый расход</h3>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <form id="transactionForm">
+                <div class="form-group">
+                    <label for="amount">Сумма (₽)</label>
+                    <input type="number" id="amount" step="0.01" min="0.01" required placeholder="0.00" autofocus>
+                </div>
+                <div class="form-group category-group" id="categoryGroup">
+                    <label>Категория</label>
+                    <div class="category-buttons" id="categoryButtons"></div>
+                </div>
+                <div class="form-group">
+                    <label for="note">Комментарий (необязательно)</label>
+                    <input type="text" id="note" placeholder="Комментарий">
+                </div>
+                <button type="submit" class="submit-btn">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settingsModalOverlay">
+        <div class="modal" id="settingsModal">
+            <div class="modal-header">
+                <h3>Настройки</h3>
+                <button class="close-btn" id="closeSettings">&times;</button>
+            </div>
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h4>Фиксированные расходы в месяц</h4>
+                    <div class="form-group">
+                        <label for="monthlyIncome">Доход в месяц (₽)</label>
+                        <input type="number" id="monthlyIncome" step="0.01" min="0" placeholder="Ваш месячный доход">
+                    </div>
+                    <div class="form-group">
+                        <label for="savingsGoal">Накопления (₽)</label>
+                        <input type="number" id="savingsGoal" step="0.01" min="0" value="200" placeholder="200">
+                    </div>
+                    <div class="form-group">
+                        <label for="transportCost">Проезд (₽)</label>
+                        <input type="number" id="transportCost" step="0.01" min="0" value="54" placeholder="54">
+                    </div>
+                    <div class="form-group">
+                        <label for="phoneCost">Телефон (₽)</label>
+                        <input type="number" id="phoneCost" step="0.01" min="0" value="57" placeholder="57">
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>Прочее</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="notificationsEnabled" checked> Уведомления о низком балансе
+                        </label>
+                    </div>
+                </div>
+                <button class="submit-btn" id="saveSettings">Сохранить настройки</button>
+                <button class="submit-btn danger" id="clearData">Очистить все данные</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(console.error);
+        }
+    </script>
+</body>
+</html>
