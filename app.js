@@ -205,6 +205,19 @@ function updateStats() {
     document.getElementById('monthlyAvailable').textContent = formatMoney(getAvailableMonthly());
 }
 
+function getMonthStart() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function canGoPrevWeek() {
+    return getWeekBounds(state.weekOffset - 1).start >= getMonthStart();
+}
+
+function canGoNextWeek() {
+    return state.weekOffset < 0;
+}
+
 function updateWeekNav() {
     const nav = document.getElementById('weekNav');
     const indicator = document.getElementById('weekIndicator');
@@ -216,8 +229,8 @@ function updateWeekNav() {
         return;
     }
     nav.classList.remove('hidden');
-    nextBtn.disabled = state.weekOffset >= 0;
-    prevBtn.disabled = state.weekOffset <= -52;
+    nextBtn.disabled = !canGoNextWeek();
+    prevBtn.disabled = !canGoPrevWeek();
 
     if (state.weekOffset === 0) {
         indicator.textContent = 'Эта неделя';
@@ -349,13 +362,13 @@ function initTabs() {
 
 function initWeekNav() {
     document.getElementById('prevWeek').addEventListener('click', () => {
-        if (state.weekOffset > -52) {
+        if (canGoPrevWeek()) {
             state.weekOffset -= 1;
             renderAll();
         }
     });
     document.getElementById('nextWeek').addEventListener('click', () => {
-        if (state.weekOffset < 0) {
+        if (canGoNextWeek()) {
             state.weekOffset += 1;
             renderAll();
         }
