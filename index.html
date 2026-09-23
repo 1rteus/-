@@ -43,8 +43,7 @@
                         <circle class="circle-bg" cx="160" cy="160" r="105" stroke-width="8" stroke="rgba(255,255,255,0.03)"/>
                         <circle class="circle-progress quota-ring" id="quotaRing" cx="160" cy="160" r="140"
                                 stroke-dasharray="880" stroke-dashoffset="880"/>
-                        <circle class="circle-progress expense-ring" id="expenseRing" cx="160" cy="160" r="122"
-                                stroke-dasharray="766" stroke-dashoffset="766"/>
+                        <g id="expenseRings"></g>
                     </svg>
                     <div class="circle-center" id="circleCenter">
                         <div class="center-amount" id="centerAmount">0 ₽</div>
@@ -52,6 +51,11 @@
                         <div class="center-quota" id="centerQuota">Квота: 0 ₽</div>
                         <div class="center-warning" id="centerWarning"></div>
                     </div>
+                </div>
+                <div class="week-nav" id="weekNav">
+                    <button class="week-nav-btn" id="prevWeek" aria-label="Прошлая неделя">‹</button>
+                    <div class="week-indicator" id="weekIndicator">Текущая неделя</div>
+                    <button class="week-nav-btn" id="nextWeek" aria-label="Следующая неделя">›</button>
                 </div>
                 <div class="period-tabs">
                     <button class="tab-btn active" data-period="week">Неделя</button>

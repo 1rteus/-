@@ -5,7 +5,8 @@ const CATEGORIES = {
     expense: [
         { id: 'food', name: 'Еда', icon: '🍔', color: '#ff6b6b' },
         { id: 'entertainment', name: 'Развлечения', icon: '🎮', color: '#a855f7' },
-        { id: 'gifts', name: 'Подарки', icon: '🎁', color: '#f59e0b' }
+        { id: 'gifts', name: 'Подарки', icon: '🎁', color: '#f59e0b' },
+        { id: 'other', name: 'Другое', icon: '📦', color: '#64748b' }
     ]
 };
 
@@ -22,7 +23,8 @@ let state = {
     settings: { ...DEFAULT_SETTINGS },
     currentPeriod: 'week',
     currentView: 'main',
-    selectedCategory: 'food'
+    selectedCategory: 'food',
+    weekOffset: 0
 };
 
 function loadData() {
@@ -41,12 +43,12 @@ function saveData() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
 }
 
-function getPeriodBounds(period) {
+function getPeriodBounds(period, weekOffset = 0) {
     const now = new Date();
     if (period === 'week') {
         const day = now.getDay();
         const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        const start = new Date(now.setDate(diff));
+        const start = new Date(now.getFullYear(), now.getMonth(), diff - weekOffset * 7);
         start.setHours(0, 0, 0, 0);
         const end = new Date(start);
         end.setDate(end.getDate() + 6);
@@ -59,8 +61,20 @@ function getPeriodBounds(period) {
     }
 }
 
-function filterTransactions(period) {
-    const { start, end } = getPeriodBounds(period);
+function getWeeksInMonth() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const firstMonday = new Date(firstDay);
+    const day = firstDay.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    firstMonday.setDate(firstDay.getDate() + diff);
+    const diffWeeks = Math.ceil((lastDay - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    return Math.max(4, Math.min(6, diffWeeks));
+}
+
+function filterTransactions(period, weekOffset = 0) {
+    const { start, end } = getPeriodBounds(period, weekOffset);
     return state.transactions.filter(t => {
         const date = new Date(t.date);
         return date >= start && date <= end;
@@ -118,25 +132,71 @@ function updateCircle(data, period) {
     const remaining = currentQuota - expense;
     
     const quotaRing = document.getElementById('quotaRing');
-    const expenseRing = document.getElementById('expenseRing');
+    const expenseRingsContainer = document.getElementById('expenseRings');
     const centerAmount = document.getElementById('centerAmount');
     const centerLabel = document.getElementById('centerLabel');
     const centerQuota = document.getElementById('centerQuota');
     const centerWarning = document.getElementById('centerWarning');
     const circleCenter = document.getElementById('circleCenter');
     const circleWrapper = document.getElementById('circleWrapper');
+    const prevWeekBtn = document.getElementById('prevWeek');
+    const nextWeekBtn = document.getElementById('nextWeek');
+    const weekIndicator = document.getElementById('weekIndicator');
     
     const quotaCircumference = 2 * Math.PI * 140;
-    const expenseCircumference = 2 * Math.PI * 122;
+    const baseExpenseCircumference = 2 * Math.PI * 122;
     
-    let quotaProgress = 0, expenseProgress = 0;
-    const maxVal = Math.max(expense, currentQuota, 1);
+    // Calculate category totals
+    const categoryTotals = {};
+    let totalExpense = 0;
+    for (const [catId, amount] of Object.entries(byCategory)) {
+        categoryTotals[catId] = (categoryTotals[catId] || 0) + amount;
+        totalExpense += amount;
+    }
     
-    if (currentQuota > 0) quotaProgress = (currentQuota / maxVal) * quotaCircumference;
-    if (expense > 0) expenseProgress = (expense / maxVal) * expenseCircumference;
+    // Draw segmented expense rings
+    if (expenseRingsContainer.children.length === 0) {
+        // Create one ring per category
+        const categories = CATEGORIES.expense;
+        let offset = 0;
+        categories.forEach((cat, i) => {
+            const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            ring.setAttribute('class', 'category-expense-ring');
+            ring.setAttribute('cx', '160');
+            ring.setAttribute('cy', '160');
+            ring.setAttribute('r', 122 - i * 8); // Slightly smaller for each category
+            ring.setAttribute('stroke-width', 14);
+            const percent = totalExpense > 0 ? (categoryTotals[cat.id] / totalExpense) * 100 : 0;
+            const circumference = baseExpenseCircumference * (percent / 100);
+            ring.setAttribute('stroke-dasharray', circumference);
+            ring.setAttribute('stroke-dashoffset', circumference);
+            ring.setAttribute('stroke', cat.color);
+            ring.setAttribute('fill', 'none');
+            ring.setAttribute('stroke-linecap', 'round');
+            expenseRingsContainer.appendChild(ring);
+            offset += percent;
+        });
+    }
     
+    // Update ring dashoffsets based on current category totals
+    const rings = expenseRingsContainer.querySelectorAll('.category-expense-ring');
+    let cumulativeOffset = 0;
+    
+    rings.forEach((ring, i) => {
+        const catId = Object.keys(categoryTotals)[i] || 'other';
+        const amount = categoryTotals[catId] || 0;
+        const percent = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+        const circumference = baseExpenseCircumference * (percent / 100);
+        ring.setAttribute('stroke-dashoffset', circumference);
+        cumulativeOffset += percent;
+    });
+    
+    // Also update the main expense ring for backward compatibility
+    const mainExpenseRing = document.getElementById('expenseRing');
+    mainExpenseRing.style.strokeDashoffset = baseExpenseCircumference - (totalExpense / Math.max(expense, 1) * baseExpenseCircumference);
+    
+    const quotaProgress = currentQuota > 0 ? (currentQuota / Math.max(totalExpense, 1)) * quotaCircumference : 0;
     quotaRing.style.strokeDashoffset = quotaCircumference - quotaProgress;
-    expenseRing.style.strokeDashoffset = expenseCircumference - expenseProgress;
     
     const isLow = currentQuota > 0 && remaining <= 5 && remaining > 0;
     const isNegative = remaining < 0;
@@ -145,8 +205,9 @@ function updateCircle(data, period) {
         if (isLow || isNegative) {
             circleCenter.classList.add('burn');
             circleWrapper.classList.add('burn');
-            expenseRing.style.stroke = 'url(#burnGradient)';
+            mainExpenseRing.style.stroke = 'url(#burnGradient)';
             quotaRing.style.stroke = 'url(#burnGradient)';
+            rings.forEach(ring => ring.style.stroke = 'url(#burnGradient)');
             centerAmount.textContent = formatMoney(Math.max(remaining, 0));
             centerLabel.textContent = 'Остаток недели';
             centerQuota.textContent = `Квота: ${formatMoney(weeklyQuota)}`;
@@ -154,8 +215,14 @@ function updateCircle(data, period) {
         } else {
             circleCenter.classList.remove('burn');
             circleWrapper.classList.remove('burn');
-            expenseRing.style.stroke = 'url(#expenseGradient)';
+            mainExpenseRing.style.stroke = 'url(#expenseGradient)';
             quotaRing.style.stroke = 'url(#quotaGradient)';
+            rings.forEach(ring => ring.style.stroke = cat => CATEGORIES.expense.find(c => c.id === cat.id)?.color);
+            // Set each ring color
+            rings.forEach((ring, i) => {
+                const cat = CATEGORIES.expense[i];
+                if (cat) ring.style.stroke = cat.color;
+            });
             centerAmount.textContent = formatMoney(remaining);
             centerLabel.textContent = weeklyQuota > 0 ? 'Остаток недели' : 'Лимит не задан';
             centerQuota.textContent = weeklyQuota > 0 ? `Квота: ${formatMoney(weeklyQuota)}` : 'Укажите доход в настройках';
@@ -164,19 +231,49 @@ function updateCircle(data, period) {
     } else {
         circleCenter.classList.remove('burn');
         circleWrapper.classList.remove('burn');
-        expenseRing.style.stroke = 'url(#expenseGradient)';
+        mainExpenseRing.style.stroke = 'url(#expenseGradient)';
         quotaRing.style.stroke = 'url(#quotaGradient)';
+        rings.forEach(ring => ring.style.stroke = '#64748b');
         centerAmount.textContent = formatMoney(monthlyAvailable - expense);
         centerLabel.textContent = 'Баланс месяца';
         centerQuota.textContent = `Лимит месяца: ${formatMoney(monthlyAvailable)}`;
         centerWarning.textContent = '';
     }
     
-    document.getElementById('totalExpense').textContent = formatMoney(expense);
-    const weekRemaining = weeklyQuota - expense;
-    document.getElementById('totalBalance').textContent = formatMoney(isWeek ? weekRemaining : (monthlyAvailable - expense));
-    document.getElementById('totalBalance').style.color = (isWeek ? weekRemaining : (monthlyAvailable - expense)) >= 0 ? 'var(--accent-available)' : 'var(--accent-expense)';
+    // Update week navigation
+    updateWeekNavigation(period);
+    
+    document.getElementById('totalExpense').textContent = formatMoney(totalExpense);
+    const weekRemaining = weeklyQuota - totalExpense;
+    document.getElementById('totalBalance').textContent = formatMoney(isWeek ? weekRemaining : (monthlyAvailable - totalExpense));
+    document.getElementById('totalBalance').style.color = (isWeek ? weekRemaining : (monthlyAvailable - totalExpense)) >= 0 ? 'var(--accent-available)' : 'var(--accent-expense)';
     document.getElementById('monthlyAvailable').textContent = formatMoney(monthlyAvailable);
+}
+
+function updateWeekNavigation(period) {
+    const weeksInMonth = getWeeksInMonth();
+    const prevWeekBtn = document.getElementById('prevWeek');
+    const nextWeekBtn = document.getElementById('nextWeek');
+    const weekIndicator = document.getElementById('weekIndicator');
+    
+    if (period !== 'week') {
+        prevWeekBtn.style.display = 'none';
+        nextWeekBtn.style.display = 'none';
+        weekIndicator.textContent = 'Неделя';
+        return;
+    }
+    
+    prevWeekBtn.style.display = 'block';
+    nextWeekBtn.style.display = 'block';
+    
+    // Calculate which week we're showing based on currentOffset
+    const offset = state.weekOffset || 0;
+    const currentWeekNum = offset + 1;
+    weekIndicator.textContent = `Неделя ${currentWeekNum} из ${weeksInMonth}`;
+    
+    // Enable/disable navigation buttons
+    prevWeekBtn.disabled = offset <= 0;
+    nextWeekBtn.disabled = offset >= weeksInMonth - 1;
 }
 
 function renderQuotaBreakdown() {
@@ -289,7 +386,7 @@ function renderTransactions(transactions) {
 }
 
 function render() {
-    const transactions = filterTransactions(state.currentPeriod);
+    const transactions = filterTransactions(state.currentPeriod, state.weekOffset);
     const data = calculateTotals(transactions);
     
     updateCircle(data, state.currentPeriod);
@@ -338,6 +435,10 @@ function initEventListeners() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             state.currentPeriod = btn.dataset.period;
+            // Reset week offset when switching periods
+            if (state.currentPeriod !== 'week') {
+                state.weekOffset = 0;
+            }
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             render();
@@ -359,6 +460,21 @@ function initEventListeners() {
                 document.querySelector('.nav-btn[data-view="main"]').classList.add('active');
             }
         });
+    });
+    
+    document.getElementById('prevWeek').addEventListener('click', () => {
+        if (state.weekOffset > 0) {
+            state.weekOffset--;
+            render();
+        }
+    });
+    
+    document.getElementById('nextWeek').addEventListener('click', () => {
+        const weeksInMonth = getWeeksInMonth();
+        if (state.weekOffset < weeksInMonth - 1) {
+            state.weekOffset++;
+            render();
+        }
     });
     
     document.getElementById('closeModal').addEventListener('click', () => {

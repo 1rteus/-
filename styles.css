@@ -220,6 +220,53 @@ html, body {
     100% { filter: drop-shadow(0 0 35px rgba(255, 51, 51, 0.8)) drop-shadow(0 0 60px rgba(255, 51, 51, 0.5)) drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3)); }
 }
 
+.week-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 16px;
+    padding: 8px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.week-nav-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: var(--bg);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.week-nav-btn:active {
+    background: var(--bg-elevated);
+    transform: scale(0.95);
+}
+
+.week-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.week-indicator {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    min-width: 140px;
+    text-align: center;
+}
+
 .period-tabs {
     display: flex;
     gap: 10px;
@@ -969,6 +1016,9 @@ html, body {
     .stat-icon { width: 32px; height: 32px; font-size: 18px; }
     .stat-label { font-size: 9px; }
     .stat-value { font-size: 13px; }
+    .week-indicator { min-width: 120px; font-size: 12px; }
+    .week-nav { gap: 12px; padding: 6px 12px; }
+    .week-nav-btn { width: 32px; height: 32px; font-size: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
