@@ -21,10 +21,6 @@
                 <div class="circle-wrapper" id="circleWrapper">
                     <svg class="circle-svg" id="circleSvg" viewBox="0 0 320 320">
                         <defs>
-                            <linearGradient id="expenseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:#ff6b6b"/>
-                                <stop offset="100%" style="stop-color:#ee5a5a"/>
-                            </linearGradient>
                             <linearGradient id="quotaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" style="stop-color:#ffe66d"/>
                                 <stop offset="100%" style="stop-color:#ffd93d"/>
@@ -34,27 +30,25 @@
                                 <stop offset="50%" style="stop-color:#ff5533"/>
                                 <stop offset="100%" style="stop-color:#ff3333"/>
                             </linearGradient>
-                            <radialGradient id="bgGradient" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" style="stop-color:#1f2a4a"/>
-                                <stop offset="100%" style="stop-color:#131b3a"/>
-                            </radialGradient>
                         </defs>
                         <circle class="circle-bg" cx="160" cy="160" r="140"/>
                         <circle class="circle-bg" cx="160" cy="160" r="105" stroke-width="8" stroke="rgba(255,255,255,0.03)"/>
                         <circle class="circle-progress quota-ring" id="quotaRing" cx="160" cy="160" r="140"
                                 stroke-dasharray="880" stroke-dashoffset="880"/>
+                        <circle class="circle-progress expense-track" id="expenseTrack" cx="160" cy="160" r="122"
+                                stroke-dasharray="766" stroke-dashoffset="766"/>
                         <g id="expenseRings"></g>
                     </svg>
                     <div class="circle-center" id="circleCenter">
                         <div class="center-amount" id="centerAmount">0 ₽</div>
                         <div class="center-label" id="centerLabel">Недельный лимит</div>
-                        <div class="center-quota" id="centerQuota">Квота: 0 ₽</div>
+                        <div class="center-quota" id="centerQuota">Укажите доход</div>
                         <div class="center-warning" id="centerWarning"></div>
                     </div>
                 </div>
                 <div class="week-nav" id="weekNav">
                     <button class="week-nav-btn" id="prevWeek" aria-label="Прошлая неделя">‹</button>
-                    <div class="week-indicator" id="weekIndicator">Текущая неделя</div>
+                    <div class="week-indicator" id="weekIndicator">Эта неделя</div>
                     <button class="week-nav-btn" id="nextWeek" aria-label="Следующая неделя">›</button>
                 </div>
                 <div class="period-tabs">
@@ -74,7 +68,7 @@
                 <div class="stat-card balance">
                     <span class="stat-icon">💵</span>
                     <div>
-                        <span class="stat-label">Остаток недели</span>
+                        <span class="stat-label" id="balanceLabel">Остаток недели</span>
                         <span class="stat-value" id="totalBalance">0 ₽</span>
                     </div>
                 </div>
@@ -158,7 +152,7 @@
                 <div class="settings-section">
                     <h4>Прочее</h4>
                     <div class="form-group">
-                        <label>
+                        <label class="checkbox-label">
                             <input type="checkbox" id="notificationsEnabled" checked> Уведомления о низком балансе
                         </label>
                     </div>

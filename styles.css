@@ -21,7 +21,6 @@
     --border: #2a2f4a;
     --border-light: #3a3f5a;
     --shadow: rgba(0, 0, 0, 0.4);
-    --shadow-soft: rgba(0, 0, 0, 0.2);
     --radius-sm: 12px;
     --radius-md: 16px;
     --radius-lg: 24px;
@@ -30,6 +29,9 @@
 
 html, body {
     height: 100%;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
     overscroll-behavior: none;
 }
 
@@ -43,19 +45,13 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-html, body {
-    overflow-x: hidden;
-    width: 100%;
-    max-width: 100vw;
-}
-
 .app {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
     max-width: 500px;
     margin: 0 auto;
-    background: 
+    background:
         radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255, 230, 109, 0.06) 0%, transparent 70%),
         radial-gradient(ellipse 60% 40% at 50% 120%, rgba(255, 107, 107, 0.06) 0%, transparent 60%),
         var(--bg);
@@ -124,20 +120,29 @@ html, body {
 
 .circle-progress {
     fill: none;
-    stroke-width: 18;
-    stroke-linecap: round;
+    stroke-linecap: butt;
     transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.4s;
-    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 }
 
 .quota-ring {
     stroke: url(#quotaGradient);
     stroke-width: 10;
-    opacity: 0.35;
+    opacity: 0.3;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 }
 
-.expense-ring {
-    stroke: url(#expenseGradient);
+.expense-track {
+    stroke: rgba(255, 107, 107, 0.08);
+    stroke-width: 18;
+    stroke-linecap: round;
+}
+
+#expenseRings circle {
+    fill: none;
+    stroke-width: 18;
+    stroke-linecap: butt;
+    transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.4s;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 }
 
 .circle-center {
@@ -230,6 +235,12 @@ html, body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    width: 100%;
+    max-width: 320px;
+}
+
+.week-nav.hidden {
+    display: none;
 }
 
 .week-nav-btn {
@@ -270,11 +281,13 @@ html, body {
 .period-tabs {
     display: flex;
     gap: 10px;
-    margin-top: 22px;
+    margin-top: 14px;
     padding: 4px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    width: 100%;
+    max-width: 320px;
 }
 
 .tab-btn {
@@ -398,125 +411,6 @@ html, body {
     letter-spacing: 1px;
     margin-bottom: 14px;
     padding-left: 4px;
-}
-
-.quota-section {
-    margin-bottom: 20px;
-}
-
-.quota-card {
-    background: linear-gradient(145deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    position: relative;
-    overflow: hidden;
-}
-
-.quota-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent-quota), var(--accent-expense), var(--accent-available));
-}
-
-.quota-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.quota-icon {
-    font-size: 24px;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 230, 109, 0.12);
-    border: 1px solid rgba(255, 230, 109, 0.2);
-    border-radius: var(--radius-md);
-}
-
-.quota-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text);
-}
-
-.quota-subtitle {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-top: 2px;
-}
-
-.quota-value {
-    font-size: 36px;
-    font-weight: 800;
-    color: var(--accent-quota);
-    line-height: 1;
-    letter-spacing: -1px;
-    margin-bottom: 16px;
-}
-
-.quota-breakdown {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.quota-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 12px;
-    transition: all 0.2s;
-}
-
-.quota-item:hover {
-    border-color: var(--border-light);
-    background: var(--bg-elevated);
-}
-
-.quota-item .qi-label {
-    color: var(--text-muted);
-}
-
-.quota-item .qi-value {
-    font-weight: 600;
-    color: var(--accent-expense);
-}
-
-.quota-item.income .qi-value {
-    color: var(--accent-available);
-}
-
-.quota-item.available {
-    border-color: var(--accent-available);
-    background: rgba(78, 205, 196, 0.08);
-}
-
-.quota-item.available .qi-label,
-.quota-item.available .qi-value {
-    color: var(--accent-available);
-}
-
-.quota-item.quota-final {
-    border-color: var(--accent-quota);
-    background: rgba(255, 230, 109, 0.08);
-}
-
-.quota-item.quota-final .qi-label,
-.quota-item.quota-final .qi-value {
-    color: var(--accent-quota);
 }
 
 .category-list {
@@ -822,7 +716,7 @@ html, body {
     border-bottom: none;
 }
 
-.form-group label {
+.form-group label:not(.checkbox-label) {
     display: block;
     font-size: 13px;
     font-weight: 600;
@@ -830,6 +724,18 @@ html, body {
     margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.checkbox-label {
+    cursor: pointer;
+    display: flex !important;
+    align-items: center;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--text) !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    margin-bottom: 0 !important;
 }
 
 #amount {
@@ -954,7 +860,7 @@ html, body {
 
 .settings-section h4 {
     font-size: 13px;
-    font-weight: 600,
+    font-weight: 600;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -995,28 +901,16 @@ html, body {
     margin-right: 10px;
 }
 
-.form-group label {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text);
-    text-transform: none;
-    letter-spacing: normal;
-}
-
 @media (max-width: 420px) {
     .circle-wrapper { width: 280px; height: 280px; }
-    .center-amount { font-size: 48px; }
+    .center-amount { font-size: 40px; }
     .category-list { grid-template-columns: 1fr; }
-    .quota-value { font-size: 30px; }
     .stats-row { gap: 6px; }
     .stat-card { padding: 12px 6px; gap: 6px; }
     .stat-icon { width: 32px; height: 32px; font-size: 18px; }
     .stat-label { font-size: 9px; }
     .stat-value { font-size: 13px; }
-    .week-indicator { min-width: 120px; font-size: 12px; }
+    .week-indicator { min-width: 100px; font-size: 12px; }
     .week-nav { gap: 12px; padding: 6px 12px; }
     .week-nav-btn { width: 32px; height: 32px; font-size: 18px; }
 }
