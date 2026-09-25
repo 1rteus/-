@@ -47,6 +47,7 @@
                         <div class="center-amount" id="centerAmount">0 ₽</div>
                         <div class="center-label" id="centerLabel">Недельный лимит</div>
                         <div class="center-quota" id="centerQuota">Укажите доход</div>
+                        <div class="center-carry hidden" id="centerCarry"></div>
                         <div class="center-warning" id="centerWarning"></div>
                     </div>
                 </div>
@@ -76,11 +77,18 @@
                         <span class="stat-value" id="totalBalance">0 ₽</span>
                     </div>
                 </div>
-                <div class="stat-card monthly">
-                    <span class="stat-icon">📅</span>
+                <div class="stat-card income">
+                    <span class="stat-icon">💰</span>
                     <div>
-                        <span class="stat-label">Доступно в месяц</span>
-                        <span class="stat-value" id="monthlyAvailable">0 ₽</span>
+                        <span class="stat-label">Пришло</span>
+                        <span class="stat-value" id="lastIncome">—</span>
+                    </div>
+                </div>
+                <div class="stat-card days">
+                    <span class="stat-icon">⏳</span>
+                    <div>
+                        <span class="stat-label">До пополнения</span>
+                        <span class="stat-value" id="daysToTopUp">—</span>
                     </div>
                 </div>
             </div>
@@ -111,12 +119,23 @@
             </div>
             <form id="transactionForm">
                 <div class="form-group">
+                    <label>Тип операции</label>
+                    <div class="type-toggle" id="typeToggle">
+                        <button type="button" class="type-btn active" data-type="expense">Расход</button>
+                        <button type="button" class="type-btn" data-type="income">Пополнение</button>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="amount">Сумма (₽)</label>
                     <input type="number" id="amount" step="0.01" min="0.01" required placeholder="0.00" autofocus>
                 </div>
                 <div class="form-group category-group" id="categoryGroup">
                     <label>Категория</label>
                     <div class="category-buttons" id="categoryButtons"></div>
+                </div>
+                <div class="form-group hidden" id="dateGroup">
+                    <label for="txDate">Когда пришло</label>
+                    <input type="date" id="txDate">
                 </div>
                 <div class="form-group">
                     <label for="note">Комментарий (необязательно)</label>
@@ -138,7 +157,7 @@
                     <h4>Фиксированные расходы в месяц</h4>
                     <div class="form-group">
                         <label for="monthlyIncome">Доход в месяц (₽)</label>
-                        <input type="number" id="monthlyIncome" step="0.01" min="0" placeholder="Ваш месячный доход">
+                        <input type="number" id="monthlyIncome" step="0.01" min="0" placeholder="0 — брать из последнего пополнения">
                     </div>
                     <div class="form-group">
                         <label for="savingsGoal">Накопления (₽)</label>

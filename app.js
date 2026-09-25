@@ -23,13 +23,15 @@ const EXPENSE_RADIUS = 122;
 const QUOTA_C = 2 * Math.PI * QUOTA_RADIUS;
 const EXPENSE_C = 2 * Math.PI * EXPENSE_RADIUS;
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const DAY_MS = 86400000;
 
 const state = {
     transactions: [],
     settings: { ...DEFAULT_SETTINGS },
     period: 'week',
     weekOffset: 0,
-    selectedCategory: 'food'
+    selectedCategory: 'food',
+    formType: 'expense'
 };
 
 function formatMoney(value) {
@@ -37,6 +39,28 @@ function formatMoney(value) {
     const abs = Math.abs(rounded);
     const formatted = new Intl.NumberFormat('ru-RU').format(abs);
     return (rounded < 0 ? '-' : '') + formatted + ' ₽';
+}
+
+function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function todayStr() {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function addMonths(d, n) {
+    const target = new Date(d.getFullYear(), d.getMonth() + n, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(d.getDate(), lastDay));
+    return target;
+}
+
+function isIncome(t) {
+    return t.type === 'income';
 }
 
 function loadState() {
@@ -64,9 +88,22 @@ function saveSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
 }
 
+function getIncomes() {
+    return state.transactions
+        .filter(isIncome)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function getMonthlyIncomeSource() {
+    const settingsIncome = Number(state.settings.monthlyIncome) || 0;
+    if (settingsIncome > 0) return settingsIncome;
+    const incomes = getIncomes();
+    return incomes.length ? incomes[incomes.length - 1].amount : 0;
+}
+
 function getAvailableMonthly() {
     const s = state.settings;
-    const income = Number(s.monthlyIncome) || 0;
+    const income = getMonthlyIncomeSource();
     if (income <= 0) return 0;
     const total = income - (Number(s.savingsGoal) || 0) - (Number(s.transportCost) || 0) - (Number(s.phoneCost) || 0);
     return Math.max(0, total);
@@ -76,8 +113,29 @@ function getWeeklyQuota() {
     return getAvailableMonthly() / 4.33;
 }
 
-function getQuota(period) {
-    return period === 'month' ? getAvailableMonthly() : getWeeklyQuota();
+function getCycle() {
+    const incomes = getIncomes();
+    const now = new Date();
+    const past = incomes.filter((i) => new Date(i.date) <= now);
+
+    if (past.length === 0) {
+        const mb = getMonthBounds();
+        return { start: mb.start, end: mb.end, hasIncome: false };
+    }
+
+    let start = startOfDay(new Date(past[past.length - 1].date));
+    let guard = 0;
+    while (addMonths(start, 1) <= now && guard < 600) {
+        start = addMonths(start, 1);
+        guard += 1;
+    }
+    return { start, end: addMonths(start, 1), hasIncome: true };
+}
+
+function getDaysToTopUp() {
+    const cycle = getCycle();
+    if (!cycle.hasIncome) return null;
+    return Math.max(0, Math.ceil((startOfDay(cycle.end) - startOfDay(new Date())) / DAY_MS));
 }
 
 function getWeekBounds(offset) {
@@ -97,25 +155,68 @@ function getMonthBounds() {
 }
 
 function getPeriodBounds(period, weekOffset) {
-    return period === 'month' ? getMonthBounds() : getWeekBounds(weekOffset);
+    if (period === 'month') {
+        const cycle = getCycle();
+        return { start: cycle.start, end: cycle.end };
+    }
+    return getWeekBounds(weekOffset);
 }
 
-function getPeriodTransactions() {
-    const { start, end } = getPeriodBounds(state.period, state.weekOffset);
+function txnsIn(start, end) {
     return state.transactions.filter((t) => {
         const d = new Date(t.date);
         return d >= start && d < end;
     });
 }
 
+function expensesIn(start, end) {
+    return txnsIn(start, end)
+        .filter((t) => !isIncome(t))
+        .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function getPeriodTransactions() {
+    const { start, end } = getPeriodBounds(state.period, state.weekOffset);
+    return txnsIn(start, end);
+}
+
 function getPeriodExpense() {
-    return getPeriodTransactions().reduce((sum, t) => sum + t.amount, 0);
+    const { start, end } = getPeriodBounds(state.period, state.weekOffset);
+    return expensesIn(start, end);
 }
 
 function getCategoryExpense(categoryKey) {
-    return getPeriodTransactions()
-        .filter((t) => t.category === categoryKey)
+    const { start, end } = getPeriodBounds(state.period, state.weekOffset);
+    return txnsIn(start, end)
+        .filter((t) => !isIncome(t) && t.category === categoryKey)
         .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function computeWeekCarry(targetOffset) {
+    if (getAvailableMonthly() <= 0) return 0;
+
+    const cycle = getCycle();
+    const currentWeekStart = getWeekBounds(0).start;
+    const daysFromCurrent = Math.round((startOfDay(cycle.start) - currentWeekStart) / DAY_MS);
+    const fromOffset = Math.floor(daysFromCurrent / 7);
+
+    let carry = 0;
+    for (let w = fromOffset; w < targetOffset; w += 1) {
+        const b = getWeekBounds(w);
+        const spent = expensesIn(b.start, b.end);
+        const remaining = getWeeklyQuota() + carry - spent;
+        carry = (remaining < 0 || spent > 0) ? remaining : 0;
+    }
+    return carry;
+}
+
+function getWeekCarry(offset) {
+    return computeWeekCarry(offset);
+}
+
+function getAvailable() {
+    if (state.period === 'month') return getAvailableMonthly();
+    return getWeeklyQuota() + computeWeekCarry(state.weekOffset);
 }
 
 function drawCategorySegments(expense, quota, burn) {
@@ -149,11 +250,13 @@ function drawCategorySegments(expense, quota, burn) {
 }
 
 function updateCircle() {
-    const quota = getQuota(state.period);
+    const available = getAvailable();
     const expense = getPeriodExpense();
-    const remaining = quota - expense;
-    const hasQuota = quota > 0;
+    const remaining = available - expense;
+    const hasQuota = available > 0;
     const burn = hasQuota && remaining <= 5;
+    const cycle = getCycle();
+    const days = getDaysToTopUp();
 
     const quotaRing = document.getElementById('quotaRing');
     const expenseTrack = document.getElementById('expenseTrack');
@@ -162,6 +265,7 @@ function updateCircle() {
     const amountEl = document.getElementById('centerAmount');
     const labelEl = document.getElementById('centerLabel');
     const quotaEl = document.getElementById('centerQuota');
+    const carryEl = document.getElementById('centerCarry');
     const warningEl = document.getElementById('centerWarning');
 
     quotaRing.style.strokeDasharray = String(QUOTA_C);
@@ -170,16 +274,31 @@ function updateCircle() {
     expenseTrack.style.strokeDashoffset = hasQuota ? '0' : String(EXPENSE_C);
     expenseTrack.style.opacity = hasQuota ? '1' : '0';
 
-    drawCategorySegments(expense, quota, burn);
+    drawCategorySegments(expense, available, burn);
 
     if (hasQuota) {
         amountEl.textContent = formatMoney(remaining);
-        labelEl.textContent = state.period === 'month' ? 'Остаток месяца' : 'Остаток недели';
-        quotaEl.textContent = 'Квота: ' + formatMoney(quota);
+        if (state.period === 'month') {
+            labelEl.textContent = 'Остаток до пополнения';
+            quotaEl.textContent = days !== null
+                ? 'Квота: ' + formatMoney(available) + ' · ' + days + ' дн.'
+                : 'Квота: ' + formatMoney(available);
+        } else {
+            labelEl.textContent = 'Остаток недели';
+            quotaEl.textContent = 'Квота: ' + formatMoney(available);
+        }
+        const carry = state.period === 'week' ? getWeekCarry(state.weekOffset) : 0;
+        if (Math.abs(carry) >= 0.5) {
+            carryEl.textContent = 'Перенос: ' + formatMoney(carry);
+            carryEl.classList.remove('hidden');
+        } else {
+            carryEl.classList.add('hidden');
+        }
     } else {
         amountEl.textContent = formatMoney(expense);
         labelEl.textContent = 'Потрачено';
         quotaEl.textContent = 'Укажите доход';
+        carryEl.classList.add('hidden');
     }
 
     if (burn) {
@@ -191,18 +310,24 @@ function updateCircle() {
         wrapper.classList.remove('burn');
         center.classList.remove('burn');
     }
+
+    void cycle;
 }
 
 function updateStats() {
-    const quota = getQuota(state.period);
+    const available = getAvailable();
     const expense = getPeriodExpense();
-    const remaining = quota - expense;
+    const remaining = available - expense;
+    const incomes = getIncomes();
+    const days = getDaysToTopUp();
 
     document.getElementById('totalExpense').textContent = formatMoney(expense);
-    document.getElementById('totalBalance').textContent = formatMoney(quota > 0 ? remaining : 0);
+    document.getElementById('totalBalance').textContent = formatMoney(available > 0 ? remaining : 0);
     document.getElementById('balanceLabel').textContent =
-        state.period === 'month' ? 'Остаток месяца' : 'Остаток недели';
-    document.getElementById('monthlyAvailable').textContent = formatMoney(getAvailableMonthly());
+        state.period === 'month' ? 'Остаток до пополнения' : 'Остаток недели';
+    document.getElementById('lastIncome').textContent =
+        incomes.length ? formatMoney(incomes[incomes.length - 1].amount) : '—';
+    document.getElementById('daysToTopUp').textContent = days !== null ? days + ' дн.' : '—';
 }
 
 function getMonthStart() {
@@ -244,7 +369,7 @@ function updateWeekNav() {
 function renderCategoryList() {
     const container = document.getElementById('categoryList');
     const expense = getPeriodExpense();
-    const quota = getQuota(state.period);
+    const quota = getAvailable();
     container.innerHTML = '';
 
     Object.keys(CATEGORIES).forEach((key) => {
@@ -286,7 +411,10 @@ function renderTransactions() {
     }
 
     items.forEach((t) => {
-        const cat = CATEGORIES[t.category] || CATEGORIES.other;
+        const income = isIncome(t);
+        const cat = income
+            ? { name: 'Пополнение', icon: '💰', color: '#4ecdc4' }
+            : (CATEGORIES[t.category] || CATEGORIES.other);
         const d = new Date(t.date);
         const dateStr = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
         const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -300,7 +428,7 @@ function renderTransactions() {
                 ${t.note ? `<div class="transaction-note">${escapeHtml(t.note)}</div>` : ''}
             </div>
             <div class="transaction-right">
-                <div class="transaction-amount">-${formatMoney(t.amount)}</div>
+                <div class="transaction-amount${income ? ' income' : ''}">${income ? '+' : '-'}${formatMoney(t.amount)}</div>
                 <div class="transaction-date">${dateStr} ${timeStr}</div>
             </div>
             <button class="delete-btn" data-id="${t.id}" aria-label="Удалить">✕</button>
@@ -333,6 +461,15 @@ function renderCategoryButtons() {
     });
 }
 
+function setFormType(type) {
+    state.formType = type;
+    document.querySelectorAll('.type-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.type === type);
+    });
+    document.getElementById('categoryGroup').classList.toggle('hidden', type === 'income');
+    document.getElementById('dateGroup').classList.toggle('hidden', type !== 'income');
+}
+
 function renderAll() {
     updateCircle();
     updateStats();
@@ -347,6 +484,12 @@ function openModal(id) {
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+}
+
+function openAddModal() {
+    const dateInput = document.getElementById('txDate');
+    if (dateInput) dateInput.value = todayStr();
+    openModal('modalOverlay');
 }
 
 function initTabs() {
@@ -380,7 +523,7 @@ function initBottomNav() {
         btn.addEventListener('click', () => {
             const view = btn.dataset.view;
             if (view === 'add') {
-                openModal('modalOverlay');
+                openAddModal();
             } else if (view === 'settings') {
                 openSettings();
             } else {
@@ -409,21 +552,38 @@ function initForm() {
         setActiveNav('main');
     });
 
+    document.querySelectorAll('.type-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setFormType(btn.dataset.type));
+    });
+
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         const amountInput = document.getElementById('amount');
         const noteInput = document.getElementById('note');
         const amount = parseFloat(amountInput.value);
 
-        if (!amount || amount <= 0 || !CATEGORIES[state.selectedCategory]) return;
+        if (!amount || amount <= 0) return;
 
-        state.transactions.push({
+        const tx = {
             id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
             amount: Math.round(amount * 100) / 100,
-            category: state.selectedCategory,
             note: noteInput.value.trim(),
             date: new Date().toISOString()
-        });
+        };
+
+        if (state.formType === 'income') {
+            const dateVal = document.getElementById('txDate').value;
+            if (dateVal) {
+                const [y, m, d] = dateVal.split('-').map(Number);
+                tx.date = new Date(y, m - 1, d).toISOString();
+            }
+            tx.type = 'income';
+        } else {
+            if (!CATEGORIES[state.selectedCategory]) return;
+            tx.category = state.selectedCategory;
+        }
+
+        state.transactions.push(tx);
         saveState();
         form.reset();
         state.selectedCategory = 'food';
@@ -510,6 +670,7 @@ function initSettings() {
 function init() {
     loadState();
     renderCategoryButtons();
+    setFormType('expense');
     initTabs();
     initWeekNav();
     initBottomNav();

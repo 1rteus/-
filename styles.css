@@ -5,6 +5,7 @@
 }
 
 :root {
+    color-scheme: dark;
     --bg: #0d0f1a;
     --bg-elevated: #131628;
     --bg-card: #1a1e35;
@@ -196,6 +197,23 @@ body {
     transition: all 0.3s;
 }
 
+.center-carry {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-available);
+    margin-top: 6px;
+    padding: 3px 10px;
+    background: rgba(78, 205, 196, 0.1);
+    border: 1px solid rgba(78, 205, 196, 0.15);
+    border-radius: 16px;
+    display: inline-block;
+    max-width: 200px;
+}
+
+.hidden {
+    display: none !important;
+}
+
 .center-warning {
     font-size: 15px;
     font-weight: 700;
@@ -338,7 +356,7 @@ body {
 
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
     margin-bottom: 18px;
 }
@@ -374,7 +392,8 @@ body {
 
 .stat-card.expense .stat-icon { background: rgba(255, 107, 107, 0.15); color: var(--accent-expense); }
 .stat-card.balance .stat-icon { background: rgba(78, 205, 196, 0.15); color: var(--accent-available); }
-.stat-card.monthly .stat-icon { background: rgba(255, 230, 109, 0.15); color: var(--accent-quota); }
+.stat-card.income .stat-icon { background: rgba(78, 205, 196, 0.15); color: var(--accent-available); }
+.stat-card.days .stat-icon { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
 
 .stat-card > div {
     flex: 1;
@@ -404,7 +423,8 @@ body {
 
 .stat-card.expense .stat-value { color: var(--accent-expense); }
 .stat-card.balance .stat-value { color: var(--accent-available); }
-.stat-card.monthly .stat-value { color: var(--accent-quota); }
+.stat-card.income .stat-value { color: var(--accent-available); }
+.stat-card.days .stat-value { color: #a855f7; }
 
 .section {
     margin-bottom: 24px;
@@ -559,6 +579,10 @@ body {
     font-weight: 700;
     font-size: 15px;
     color: var(--accent-expense);
+}
+
+.transaction-amount.income {
+    color: var(--accent-available);
 }
 
 .transaction-date {
@@ -807,7 +831,40 @@ body {
     font-size: 18px;
 }
 
-#note {
+.type-toggle {
+    display: flex;
+    gap: 8px;
+    padding: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.type-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.type-btn.active {
+    background: linear-gradient(135deg, var(--accent-quota), var(--accent-quota-dark));
+    color: var(--bg);
+    box-shadow: 0 2px 12px rgba(255, 230, 109, 0.25);
+}
+
+.type-btn:active {
+    transform: scale(0.97);
+}
+
+#note, #txDate {
     width: 100%;
     padding: 14px 16px;
     font-size: 15px;
@@ -817,9 +874,10 @@ body {
     border-radius: var(--radius-md);
     color: var(--text);
     transition: all 0.25s;
+    color-scheme: dark;
 }
 
-#note:focus {
+#note:focus, #txDate:focus {
     outline: none;
     border-color: var(--accent-quota);
     box-shadow: 0 0 0 4px rgba(255, 230, 109, 0.15);
