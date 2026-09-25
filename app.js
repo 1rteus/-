@@ -35,10 +35,27 @@ const state = {
 };
 
 function formatMoney(value) {
-    const rounded = Math.round(value);
-    const abs = Math.abs(rounded);
-    const formatted = new Intl.NumberFormat('ru-RU').format(abs);
-    return (rounded < 0 ? '-' : '') + formatted + ' ₽';
+    const totalKop = Math.round(Math.abs(value) * 100);
+    const whole = Math.floor(totalKop / 100);
+    const kop = totalKop % 100;
+    const sign = value < 0 ? '-' : '';
+    const wholeStr = new Intl.NumberFormat('ru-RU').format(whole);
+    if (kop === 0) return sign + wholeStr + ' ₽';
+    return sign + wholeStr + '.' + String(kop).padStart(2, '0') + ' ₽';
+}
+
+function parseAmount(raw) {
+    const normalized = String(raw).trim().replace(',', '.');
+    if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+    const value = parseFloat(normalized);
+    if (!value || value <= 0) return null;
+    return Math.round(value * 100) / 100;
+}
+
+function parseFloatSafe(raw, fallback) {
+    const normalized = String(raw == null ? '' : raw).trim().replace(',', '.');
+    const value = parseFloat(normalized);
+    return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 function startOfDay(d) {
@@ -560,13 +577,13 @@ function initForm() {
         e.preventDefault();
         const amountInput = document.getElementById('amount');
         const noteInput = document.getElementById('note');
-        const amount = parseFloat(amountInput.value);
+        const amount = parseAmount(amountInput.value);
 
-        if (!amount || amount <= 0) return;
+        if (!amount) return;
 
         const tx = {
             id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-            amount: Math.round(amount * 100) / 100,
+            amount,
             note: noteInput.value.trim(),
             date: new Date().toISOString()
         };
@@ -638,10 +655,10 @@ function initSettings() {
 
     saveBtn.addEventListener('click', () => {
         state.settings = {
-            monthlyIncome: Math.max(0, parseFloat(document.getElementById('monthlyIncome').value) || 0),
-            savingsGoal: Math.max(0, parseFloat(document.getElementById('savingsGoal').value) || 0),
-            transportCost: Math.max(0, parseFloat(document.getElementById('transportCost').value) || 0),
-            phoneCost: Math.max(0, parseFloat(document.getElementById('phoneCost').value) || 0),
+            monthlyIncome: parseFloatSafe(document.getElementById('monthlyIncome').value, 0),
+            savingsGoal: parseFloatSafe(document.getElementById('savingsGoal').value, 0),
+            transportCost: parseFloatSafe(document.getElementById('transportCost').value, 0),
+            phoneCost: parseFloatSafe(document.getElementById('phoneCost').value, 0),
             notificationsEnabled: document.getElementById('notificationsEnabled').checked
         };
         saveSettings();
