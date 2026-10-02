@@ -1,7 +1,5 @@
 'use strict';
 
-const APP_VERSION = '0.5';
-
 const CATEGORIES = {
     food: { name: 'Еда', icon: '🍔', color: '#ff6b6b' },
     fun: { name: 'Развлечения', icon: '🎮', color: '#a855f7' },
@@ -211,14 +209,24 @@ function getCategoryExpense(categoryKey) {
         .reduce((sum, t) => sum + t.amount, 0);
 }
 
-function computeWeekCarry(targetOffset) {
+function getChainAnchor() {
+    let anchorMs = +getCycle().start;
+    state.transactions.forEach((t) => {
+        const d = +new Date(t.date);
+        if (d < anchorMs) anchorMs = d;
+    });
+    return startOfDay(new Date(anchorMs));
+}
+
+function weekOffsetOf(date) {
+    const currentWeekStart = getWeekBounds(0).start;
+    return Math.floor(Math.round((startOfDay(date) - currentWeekStart) / DAY_MS) / 7);
+}
+
+function chainCarryAtWeek(targetOffset) {
     if (getAvailableMonthly() <= 0) return 0;
 
-    const cycle = getCycle();
-    const currentWeekStart = getWeekBounds(0).start;
-    const daysFromCurrent = Math.round((startOfDay(cycle.start) - currentWeekStart) / DAY_MS);
-    const fromOffset = Math.floor(daysFromCurrent / 7);
-
+    const fromOffset = Math.max(weekOffsetOf(getChainAnchor()), targetOffset - 520);
     let carry = 0;
     for (let w = fromOffset; w < targetOffset; w += 1) {
         const b = getWeekBounds(w);
@@ -230,12 +238,19 @@ function computeWeekCarry(targetOffset) {
 }
 
 function getWeekCarry(offset) {
-    return computeWeekCarry(offset);
+    return chainCarryAtWeek(offset);
+}
+
+function getMonthCarry() {
+    return chainCarryAtWeek(weekOffsetOf(getCycle().start));
 }
 
 function getAvailable() {
-    if (state.period === 'month') return getAvailableMonthly();
-    return getWeeklyQuota() + computeWeekCarry(state.weekOffset);
+    if (state.period === 'month') {
+        const base = getAvailableMonthly();
+        return base > 0 ? base + getMonthCarry() : 0;
+    }
+    return getWeeklyQuota() + chainCarryAtWeek(state.weekOffset);
 }
 
 function drawCategorySegments(expense, quota, burn) {
@@ -274,7 +289,6 @@ function updateCircle() {
     const remaining = available - expense;
     const hasQuota = available > 0;
     const burn = hasQuota && remaining <= 5;
-    const cycle = getCycle();
     const days = getDaysToTopUp();
 
     const quotaRing = document.getElementById('quotaRing');
@@ -306,7 +320,7 @@ function updateCircle() {
             labelEl.textContent = 'Остаток недели';
             quotaEl.textContent = 'Квота: ' + formatMoney(available);
         }
-        const carry = state.period === 'week' ? getWeekCarry(state.weekOffset) : 0;
+        const carry = state.period === 'week' ? getWeekCarry(state.weekOffset) : getMonthCarry();
         if (Math.abs(carry) >= 0.5) {
             carryEl.textContent = 'Перенос: ' + formatMoney(carry);
             carryEl.classList.remove('hidden');
@@ -329,8 +343,6 @@ function updateCircle() {
         wrapper.classList.remove('burn');
         center.classList.remove('burn');
     }
-
-    void cycle;
 }
 
 function updateStats() {
@@ -638,65 +650,7 @@ function openSettings() {
     openModal('settingsModalOverlay');
 }
 
-function exportData() {
-    const payload = {
-        app: 'finance-tracker',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        transactions: state.transactions,
-        settings: state.settings
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'finansy-kopiya-' + todayStr() + '.json';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-
-function importDataFile(file) {
-    const reader = new FileReader();
-    reader.onload = () => {
-        try {
-            const payload = JSON.parse(reader.result);
-            const list = Array.isArray(payload) ? payload : (payload && payload.transactions);
-            if (!Array.isArray(list)) throw new Error('bad');
-
-            const existing = new Set(state.transactions.map((t) => t.id));
-            let added = 0;
-            list.forEach((t) => {
-                if (!t || typeof t.amount !== 'number' || !(t.amount > 0)) return;
-                if (t.id && existing.has(t.id)) return;
-                if (!t.id) t.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-                state.transactions.push(t);
-                existing.add(t.id);
-                added += 1;
-            });
-            state.transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-            const importedSettings = !Array.isArray(payload) && payload && payload.settings;
-            if (importedSettings && typeof importedSettings === 'object') {
-                state.settings = { ...DEFAULT_SETTINGS, ...state.settings, ...importedSettings };
-                saveSettings();
-                openSettings();
-            }
-
-            saveState();
-            renderAll();
-            alert('Готово! Добавлено операций: ' + added);
-        } catch (err) {
-            alert('Не удалось прочитать файл копии.');
-        }
-    };
-    reader.onerror = () => alert('Не удалось прочитать файл.');
-    reader.readAsText(file);
-}
-
 function initSettings() {
-    document.getElementById('appVersion').textContent = 'Версия ' + APP_VERSION;
     const overlay = document.getElementById('settingsModalOverlay');
     const closeBtn = document.getElementById('closeSettings');
     const saveBtn = document.getElementById('saveSettings');
@@ -711,16 +665,6 @@ function initSettings() {
     closeBtn.addEventListener('click', () => {
         closeModal('settingsModalOverlay');
         setActiveNav('main');
-    });
-
-    document.getElementById('exportData').addEventListener('click', exportData);
-    document.getElementById('importData').addEventListener('click', () => {
-        document.getElementById('importFile').click();
-    });
-    document.getElementById('importFile').addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) importDataFile(file);
-        e.target.value = '';
     });
 
     saveBtn.addEventListener('click', () => {

@@ -938,41 +938,6 @@ body {
     margin-top: 4px;
 }
 
-.settings-hint {
-    font-size: 12px;
-    line-height: 1.45;
-    color: var(--text-dim);
-    margin: -4px 0 12px;
-}
-
-.backup-btn {
-    width: 100%;
-    padding: 13px 16px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: var(--radius-md);
-    font-size: 14px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.backup-btn:active {
-    background: var(--bg-card-hover);
-    border-color: var(--border-light);
-    transform: scale(0.98);
-}
-
-.app-version {
-    text-align: center;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 0.5px;
-    padding: 4px 0 12px;
-}
-
 #monthlyIncome, #savingsGoal, #transportCost, #phoneCost {
     width: 100%;
     padding: 14px 16px;

@@ -180,23 +180,8 @@
                         </label>
                     </div>
                 </div>
-                <div class="settings-section">
-                    <h4>Резервная копия</h4>
-                    <div class="form-group">
-                        <label>Сохранить данные</label>
-                        <p class="settings-hint">Скачайте файл с вашими операциями на телефон — тогда они не пропадут при любых обновлениях и чистках браузера.</p>
-                        <button type="button" class="backup-btn" id="exportData">Скачать копию</button>
-                    </div>
-                    <div class="form-group">
-                        <label>Восстановить данные</label>
-                        <p class="settings-hint">Если данные пропадут — выберите ранее сохранённый файл копии, всё вернётся.</p>
-                        <button type="button" class="backup-btn" id="importData">Выбрать файл копии</button>
-                        <input type="file" id="importFile" accept=".json,application/json" class="hidden">
-                    </div>
-                </div>
                 <button class="submit-btn" id="saveSettings">Сохранить настройки</button>
                 <button class="submit-btn danger" id="clearData">Очистить все данные</button>
-                <div class="app-version" id="appVersion"></div>
             </div>
         </div>
     </div>
@@ -205,6 +190,11 @@
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(console.error);
+            let hadController = !!navigator.serviceWorker.controller;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (hadController) window.location.reload();
+                hadController = true;
+            });
         }
     </script>
 </body>
