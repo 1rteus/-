@@ -965,6 +965,14 @@ body {
     transform: scale(0.98);
 }
 
+.app-version {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    padding: 4px 0 12px;
+}
+
 #monthlyIncome, #savingsGoal, #transportCost, #phoneCost {
     width: 100%;
     padding: 14px 16px;

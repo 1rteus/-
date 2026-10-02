@@ -1,5 +1,7 @@
 'use strict';
 
+const APP_VERSION = '0.5';
+
 const CATEGORIES = {
     food: { name: 'Еда', icon: '🍔', color: '#ff6b6b' },
     fun: { name: 'Развлечения', icon: '🎮', color: '#a855f7' },
@@ -694,6 +696,7 @@ function importDataFile(file) {
 }
 
 function initSettings() {
+    document.getElementById('appVersion').textContent = 'Версия ' + APP_VERSION;
     const overlay = document.getElementById('settingsModalOverlay');
     const closeBtn = document.getElementById('closeSettings');
     const saveBtn = document.getElementById('saveSettings');
