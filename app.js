@@ -636,6 +636,63 @@ function openSettings() {
     openModal('settingsModalOverlay');
 }
 
+function exportData() {
+    const payload = {
+        app: 'finance-tracker',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        transactions: state.transactions,
+        settings: state.settings
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'finansy-kopiya-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function importDataFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const payload = JSON.parse(reader.result);
+            const list = Array.isArray(payload) ? payload : (payload && payload.transactions);
+            if (!Array.isArray(list)) throw new Error('bad');
+
+            const existing = new Set(state.transactions.map((t) => t.id));
+            let added = 0;
+            list.forEach((t) => {
+                if (!t || typeof t.amount !== 'number' || !(t.amount > 0)) return;
+                if (t.id && existing.has(t.id)) return;
+                if (!t.id) t.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                state.transactions.push(t);
+                existing.add(t.id);
+                added += 1;
+            });
+            state.transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const importedSettings = !Array.isArray(payload) && payload && payload.settings;
+            if (importedSettings && typeof importedSettings === 'object') {
+                state.settings = { ...DEFAULT_SETTINGS, ...state.settings, ...importedSettings };
+                saveSettings();
+                openSettings();
+            }
+
+            saveState();
+            renderAll();
+            alert('Готово! Добавлено операций: ' + added);
+        } catch (err) {
+            alert('Не удалось прочитать файл копии.');
+        }
+    };
+    reader.onerror = () => alert('Не удалось прочитать файл.');
+    reader.readAsText(file);
+}
+
 function initSettings() {
     const overlay = document.getElementById('settingsModalOverlay');
     const closeBtn = document.getElementById('closeSettings');
@@ -651,6 +708,16 @@ function initSettings() {
     closeBtn.addEventListener('click', () => {
         closeModal('settingsModalOverlay');
         setActiveNav('main');
+    });
+
+    document.getElementById('exportData').addEventListener('click', exportData);
+    document.getElementById('importData').addEventListener('click', () => {
+        document.getElementById('importFile').click();
+    });
+    document.getElementById('importFile').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) importDataFile(file);
+        e.target.value = '';
     });
 
     saveBtn.addEventListener('click', () => {
@@ -686,6 +753,9 @@ function initSettings() {
 
 function init() {
     loadState();
+    if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(() => {});
+    }
     renderCategoryButtons();
     setFormType('expense');
     initTabs();
