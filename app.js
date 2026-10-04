@@ -111,23 +111,48 @@ function getIncomes() {
         .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
-function getMonthlyIncomeSource() {
+function getDeductions() {
+    const s = state.settings;
+    return (Number(s.savingsGoal) || 0) + (Number(s.transportCost) || 0) + (Number(s.phoneCost) || 0);
+}
+
+function hasIncomeData() {
+    return getIncomes().length > 0 || (Number(state.settings.monthlyIncome) || 0) > 0;
+}
+
+function windowSum(pastIncomes) {
+    if (!pastIncomes.length) return 0;
+    const last = new Date(pastIncomes[pastIncomes.length - 1].date);
+    const cutoff = addMonths(last, -1);
+    cutoff.setDate(cutoff.getDate() + 1);
+    return pastIncomes
+        .filter((i) => new Date(i.date) > cutoff)
+        .reduce((sum, i) => sum + i.amount, 0);
+}
+
+function incomeBaseAt(date) {
     const settingsIncome = Number(state.settings.monthlyIncome) || 0;
     if (settingsIncome > 0) return settingsIncome;
-    const incomes = getIncomes();
-    return incomes.length ? incomes[incomes.length - 1].amount : 0;
+    return windowSum(getIncomes().filter((i) => new Date(i.date) <= date));
+}
+
+function getMonthlyIncomeSource() {
+    return incomeBaseAt(new Date());
 }
 
 function getAvailableMonthly() {
-    const s = state.settings;
     const income = getMonthlyIncomeSource();
     if (income <= 0) return 0;
-    const total = income - (Number(s.savingsGoal) || 0) - (Number(s.transportCost) || 0) - (Number(s.phoneCost) || 0);
-    return Math.max(0, total);
+    return Math.max(0, income - getDeductions());
+}
+
+function weeklyQuotaAt(date) {
+    const base = incomeBaseAt(date) - getDeductions();
+    return base > 0 ? base / 4.33 : 0;
 }
 
 function getWeeklyQuota() {
-    return getAvailableMonthly() / 4.33;
+    return weeklyQuotaAt(new Date());
 }
 
 function getCycle() {
@@ -224,14 +249,14 @@ function weekOffsetOf(date) {
 }
 
 function chainCarryAtWeek(targetOffset) {
-    if (getAvailableMonthly() <= 0) return 0;
+    if (!hasIncomeData()) return 0;
 
     const fromOffset = Math.max(weekOffsetOf(getChainAnchor()), targetOffset - 520);
     let carry = 0;
     for (let w = fromOffset; w < targetOffset; w += 1) {
         const b = getWeekBounds(w);
         const spent = expensesIn(b.start, b.end);
-        const remaining = getWeeklyQuota() + carry - spent;
+        const remaining = weeklyQuotaAt(new Date(b.end.getTime() - 1)) + carry - spent;
         carry = (remaining < 0 || spent > 0) ? remaining : 0;
     }
     return carry;
@@ -246,9 +271,9 @@ function getMonthCarry() {
 }
 
 function getAvailable() {
+    if (!hasIncomeData()) return 0;
     if (state.period === 'month') {
-        const base = getAvailableMonthly();
-        return base > 0 ? base + getMonthCarry() : 0;
+        return getAvailableMonthly() + getMonthCarry();
     }
     return getWeeklyQuota() + chainCarryAtWeek(state.weekOffset);
 }
@@ -287,8 +312,9 @@ function updateCircle() {
     const available = getAvailable();
     const expense = getPeriodExpense();
     const remaining = available - expense;
+    const hasData = hasIncomeData();
     const hasQuota = available > 0;
-    const burn = hasQuota && remaining <= 5;
+    const burn = hasData && remaining <= 5 && (hasQuota || expense > 0);
     const days = getDaysToTopUp();
 
     const quotaRing = document.getElementById('quotaRing');
@@ -309,7 +335,7 @@ function updateCircle() {
 
     drawCategorySegments(expense, available, burn);
 
-    if (hasQuota) {
+    if (hasData) {
         amountEl.textContent = formatMoney(remaining);
         if (state.period === 'month') {
             labelEl.textContent = 'Остаток до пополнения';
@@ -349,15 +375,16 @@ function updateStats() {
     const available = getAvailable();
     const expense = getPeriodExpense();
     const remaining = available - expense;
-    const incomes = getIncomes();
+    const hasData = hasIncomeData();
     const days = getDaysToTopUp();
+    const windowIncome = windowSum(getIncomes());
 
     document.getElementById('totalExpense').textContent = formatMoney(expense);
-    document.getElementById('totalBalance').textContent = formatMoney(available > 0 ? remaining : 0);
+    document.getElementById('totalBalance').textContent = formatMoney(hasData ? remaining : 0);
     document.getElementById('balanceLabel').textContent =
         state.period === 'month' ? 'Остаток до пополнения' : 'Остаток недели';
     document.getElementById('lastIncome').textContent =
-        incomes.length ? formatMoney(incomes[incomes.length - 1].amount) : '—';
+        windowIncome > 0 ? formatMoney(windowIncome) : '—';
     document.getElementById('daysToTopUp').textContent = days !== null ? days + ' дн.' : '—';
 }
 
