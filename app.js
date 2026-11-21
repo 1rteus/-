@@ -11,7 +11,6 @@ const STORAGE_KEY = 'finance_tracker_data';
 const SETTINGS_KEY = 'finance_tracker_settings';
 
 const DEFAULT_SETTINGS = {
-    weeklyBudget: 0,
     monthlyIncome: 0,
     savingsGoal: 200,
     transportCost: 54,
@@ -117,12 +116,8 @@ function getDeductions() {
     return (Number(s.savingsGoal) || 0) + (Number(s.transportCost) || 0) + (Number(s.phoneCost) || 0);
 }
 
-function isManualBudget() {
-    return (Number(state.settings.weeklyBudget) || 0) > 0;
-}
-
 function hasIncomeData() {
-    return isManualBudget() || getIncomes().length > 0 || (Number(state.settings.monthlyIncome) || 0) > 0;
+    return getIncomes().length > 0 || (Number(state.settings.monthlyIncome) || 0) > 0;
 }
 
 function windowSum(pastIncomes) {
@@ -146,20 +141,12 @@ function getMonthlyIncomeSource() {
 }
 
 function getAvailableMonthly() {
-    if (isManualBudget()) {
-        const cycle = getCycle();
-        const days = Math.max(1, Math.round((cycle.end - cycle.start) / DAY_MS));
-        return (Number(state.settings.weeklyBudget) || 0) * (days / 7);
-    }
     const income = getMonthlyIncomeSource();
     if (income <= 0) return 0;
     return Math.max(0, income - getDeductions());
 }
 
 function weeklyQuotaAt(date) {
-    if (isManualBudget()) {
-        return Number(state.settings.weeklyBudget) || 0;
-    }
     const base = incomeBaseAt(date) - getDeductions();
     return base > 0 ? base / 4.33 : 0;
 }
@@ -188,10 +175,6 @@ function getCycle() {
 }
 
 function getDaysToTopUp() {
-    if (isManualBudget()) {
-        const { end } = state.period === 'month' ? getCycle() : getWeekBounds(0);
-        return Math.max(0, Math.ceil((startOfDay(end) - startOfDay(new Date())) / DAY_MS));
-    }
     const cycle = getCycle();
     if (!cycle.hasIncome) return null;
     return Math.max(0, Math.ceil((startOfDay(cycle.end) - startOfDay(new Date())) / DAY_MS));
@@ -280,12 +263,10 @@ function chainCarryAtWeek(targetOffset) {
 }
 
 function getWeekCarry(offset) {
-    if (isManualBudget()) return 0;
     return chainCarryAtWeek(offset);
 }
 
 function getMonthCarry() {
-    if (isManualBudget()) return 0;
     return chainCarryAtWeek(weekOffsetOf(getCycle().start));
 }
 
@@ -354,18 +335,16 @@ function updateCircle() {
 
     drawCategorySegments(expense, available, burn);
 
-    const quotaWord = isManualBudget() ? 'Бюджет' : 'Квота';
-
     if (hasData) {
         amountEl.textContent = formatMoney(remaining);
         if (state.period === 'month') {
-            labelEl.textContent = isManualBudget() ? 'Остаток на месяц' : 'Остаток до пополнения';
+            labelEl.textContent = 'Остаток до пополнения';
             quotaEl.textContent = days !== null
-                ? quotaWord + ': ' + formatMoney(available) + ' · ' + days + ' дн.'
-                : quotaWord + ': ' + formatMoney(available);
+                ? 'Квота: ' + formatMoney(available) + ' · ' + days + ' дн.'
+                : 'Квота: ' + formatMoney(available);
         } else {
             labelEl.textContent = 'Остаток недели';
-            quotaEl.textContent = quotaWord + ': ' + formatMoney(available);
+            quotaEl.textContent = 'Квота: ' + formatMoney(available);
         }
         const carry = state.period === 'week' ? getWeekCarry(state.weekOffset) : getMonthCarry();
         if (Math.abs(carry) >= 0.5) {
@@ -377,7 +356,7 @@ function updateCircle() {
     } else {
         amountEl.textContent = formatMoney(expense);
         labelEl.textContent = 'Потрачено';
-        quotaEl.textContent = 'Укажите бюджет';
+        quotaEl.textContent = 'Укажите доход';
         carryEl.classList.add('hidden');
     }
 
@@ -402,19 +381,10 @@ function updateStats() {
 
     document.getElementById('totalExpense').textContent = formatMoney(expense);
     document.getElementById('totalBalance').textContent = formatMoney(hasData ? remaining : 0);
-    document.getElementById('balanceLabel').textContent = state.period === 'month'
-        ? (isManualBudget() ? 'Остаток на месяц' : 'Остаток до пополнения')
-        : 'Остаток недели';
-
-    const lastIncomeLabel = document.getElementById('lastIncomeLabel');
-    const lastIncomeEl = document.getElementById('lastIncome');
-    if (isManualBudget()) {
-        lastIncomeLabel.textContent = 'Бюджет недели';
-        lastIncomeEl.textContent = formatMoney(Number(state.settings.weeklyBudget) || 0);
-    } else {
-        lastIncomeLabel.textContent = 'Пришло';
-        lastIncomeEl.textContent = windowIncome > 0 ? formatMoney(windowIncome) : '—';
-    }
+    document.getElementById('balanceLabel').textContent =
+        state.period === 'month' ? 'Остаток до пополнения' : 'Остаток недели';
+    document.getElementById('lastIncome').textContent =
+        windowIncome > 0 ? formatMoney(windowIncome) : '—';
     document.getElementById('daysToTopUp').textContent = days !== null ? days + ' дн.' : '—';
 }
 
@@ -699,7 +669,6 @@ function initTransactionsDelete() {
 }
 
 function openSettings() {
-    document.getElementById('weeklyBudget').value = state.settings.weeklyBudget || '';
     document.getElementById('monthlyIncome').value = state.settings.monthlyIncome || '';
     document.getElementById('savingsGoal').value = state.settings.savingsGoal || '';
     document.getElementById('transportCost').value = state.settings.transportCost || '';
@@ -727,7 +696,6 @@ function initSettings() {
 
     saveBtn.addEventListener('click', () => {
         state.settings = {
-            weeklyBudget: parseFloatSafe(document.getElementById('weeklyBudget').value, 0),
             monthlyIncome: parseFloatSafe(document.getElementById('monthlyIncome').value, 0),
             savingsGoal: parseFloatSafe(document.getElementById('savingsGoal').value, 0),
             transportCost: parseFloatSafe(document.getElementById('transportCost').value, 0),
